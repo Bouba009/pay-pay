@@ -1,0 +1,1483 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prouver - Payment Verification</title>
+    <!-- Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SweetAlert2 for Professional Animated Popups -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <style>
+        /* --- CSS Variables & Reset --- */
+        :root {
+            --primary-blue: #0056b3;
+            --primary-dark: #003d82;
+            --cheque-bg: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%);
+            --success-green: #28a745;
+            --warning-orange: #fd7e14;
+            --danger-red: #dc3545;
+            --bg-light: #f4f7f6;
+            --text-dark: #333;
+            --text-light: #fff;
+            --border-radius: 8px;
+            --box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Cairo', sans-serif; }
+        body { background-color: var(--bg-light); color: var(--text-dark); overflow-x: hidden; }
+        
+        /* --- Initial Loader --- */
+        .initial-loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #ffffff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 999999;
+            transition: opacity 0.5s ease;
+        }
+        .initial-loader.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* Layout */
+        .app-container { display: flex; min-height: 100vh; flex-direction: column; }
+        
+        /* --- Sidebar & Overlay Logic --- */
+        .sidebar-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); z-index: 1040; display: none; opacity: 0; transition: opacity 0.3s; }
+        .sidebar-overlay.active { display: block; opacity: 1; }
+
+        .sidebar { position: fixed; top: 0; left: -280px; width: 280px; height: 100vh; background: #fff; box-shadow: 2px 0 15px rgba(0,0,0,0.2); padding: 20px 0; display: flex; flex-direction: column; transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1); z-index: 1050; overflow-y: auto;}
+        .sidebar.open { left: 0; }
+        
+        /* Logo in sidebar (Static) */
+        .sidebar-logo { text-align: center; font-size: 32px; font-weight: 800; color: var(--primary-blue); margin-bottom: 30px; letter-spacing: 1px; display: flex; justify-content: center; align-items: center; gap: 8px;}
+        .sidebar-logo i { color: var(--success-green); font-size: 26px; }
+        
+        .sidebar a { display: block; padding: 15px 25px; color: var(--text-dark); text-decoration: none; font-weight: 600; border-bottom: 1px solid #eee; transition: 0.3s; cursor: pointer;}
+        .sidebar a:hover { background: var(--primary-blue); color: #fff; padding-left: 35px; } 
+        
+        /* Main Content */
+        .main-content { flex: 1; padding: 20px; width: 100%; max-width: 1200px; margin: 0 auto; transition: 0.3s; }
+        
+        .header { display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 15px 20px; border-radius: var(--border-radius); box-shadow: var(--box-shadow); margin-bottom: 20px; position: sticky; top: 10px; z-index: 1000;}
+        .header-left { display: flex; align-items: center; gap: 15px; }
+        
+        /* Menu Button */
+        .menu-btn { background: var(--primary-blue); color: #fff; border: none; width: 40px; height: 40px; border-radius: 5px; font-size: 20px; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: 0.3s; box-shadow: 0 2px 5px rgba(0,0,0,0.2);}
+        .menu-btn:hover { background: var(--primary-dark); transform: scale(1.05); }
+
+        .lang-switch button { padding: 5px 15px; border: 1px solid var(--primary-blue); background: transparent; color: var(--primary-blue); border-radius: 20px; cursor: pointer; transition: 0.3s; font-weight: bold; margin: 0 2px;}
+        .lang-switch button.active { background: var(--primary-blue); color: #fff; }
+
+        /* Views */
+        .view-section { display: none; animation: fadeIn 0.5s ease; }
+        .view-section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* --- Main Animated Logo (Popup & SVG Drawing) --- */
+        .main-animated-header { text-align: center; margin-bottom: 25px; margin-top: 10px; }
+        
+        /* Popup Animation for the text */
+        @keyframes popupLogoAnim {
+            0% { transform: scale(0.5); opacity: 0; }
+            60% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        .main-logo-anim { 
+            font-size: 45px; font-weight: 900; color: var(--primary-blue); 
+            display: flex; justify-content: center; align-items: center; gap: 12px; margin-bottom: 10px;
+            animation: popupLogoAnim 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        /* SVG Checkmark Drawing Animation */
+        .draw-check { width: 45px; height: 45px; }
+        .draw-check-circle {
+            stroke: var(--success-green);
+            stroke-width: 3;
+            stroke-dasharray: 166;
+            stroke-dashoffset: 166;
+            animation: drawStroke 1s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+        }
+        .draw-check-path {
+            stroke: var(--success-green);
+            stroke-width: 4;
+            stroke-dasharray: 48;
+            stroke-dashoffset: 48;
+            animation: drawStroke 0.5s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards;
+        }
+        @keyframes drawStroke {
+            100% { stroke-dashoffset: 0; }
+        }
+
+        .main-title-text { color: var(--primary-blue); font-weight: 800; font-size: 24px; letter-spacing: 1px; }
+
+        /* --- Professional Cheque UI --- */
+        .cheque-card { background: var(--cheque-bg); border: 1px solid #d4c08c; border-radius: 12px; padding: 25px; margin: 20px 0; position: relative; box-shadow: inset 0 0 20px rgba(200,180,100,0.2), 0 5px 15px rgba(0,0,0,0.08); overflow: hidden; }
+        .cheque-card::before { content: ""; position: absolute; top: 5px; left: 5px; right: 5px; bottom: 5px; border: 1px dashed rgba(0,0,0,0.1); pointer-events: none; border-radius: 8px;}
+        .cheque-card::after { content: "Algérie Poste"; position: absolute; opacity: 0.05; font-size: 50px; font-weight: 900; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-20deg); pointer-events: none; color: var(--primary-blue);}
+        
+        .cheque-header-text { font-size: 12px; font-weight: bold; color: #555; border-bottom: 2px solid var(--primary-blue); padding-bottom: 5px; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px;}
+        
+        .cheque-info { position: relative; z-index: 2; }
+        .cheque-info p { margin-bottom: 12px; font-size: 16px; font-weight: bold; display: flex; align-items: center; flex-wrap: wrap; gap: 10px;}
+        .cheque-value { font-weight: 800; color: var(--primary-dark); font-size: 18px; background: rgba(255,255,255,0.7); padding: 4px 10px; border-radius: 4px; letter-spacing: 0.5px; border-bottom: 1px dotted #888;}
+        
+        .copy-btn { background: var(--primary-blue); color: #fff; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 14px; transition: 0.3s; display: inline-flex; align-items: center; gap: 5px;}
+        .copy-btn:hover { background: var(--primary-dark); transform: translateY(-2px); }
+
+        /* Public Form */
+        .form-container { background: #fff; padding: 25px; border-radius: 12px; box-shadow: var(--box-shadow); border-top: 4px solid var(--primary-blue); }
+        .form-group { margin-bottom: 18px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: 700; color: #444; }
+        .form-control { width: 100%; padding: 12px 15px; border: 1px solid #ddd; border-radius: var(--border-radius); outline: none; transition: 0.3s; font-family: 'Cairo'; background: #fafafa;}
+        .form-control:focus { border-color: var(--primary-blue); box-shadow: 0 0 0 3px rgba(0,86,179,0.1); background: #fff;}
+        
+        .btn-submit { background: var(--primary-blue); color: #fff; border: none; padding: 14px 25px; border-radius: 30px; font-size: 18px; font-weight: 800; cursor: pointer; width: 100%; transition: all 0.3s; box-shadow: 0 4px 10px rgba(0,86,179,0.3); display: flex; justify-content: center; align-items: center; gap: 10px;}
+        .btn-submit:hover { background: var(--primary-dark); transform: translateY(-3px); box-shadow: 0 6px 15px rgba(0,86,179,0.4); }
+        
+        .disclaimer { font-size: 14px; color: var(--danger-red); text-align: center; margin-top: 20px; font-weight: 800; background: rgba(220,53,69,0.1); padding: 10px; border-radius: 5px; border: 1px dashed var(--danger-red);}
+
+        /* Image Display */
+        .alg-poste-img { width: 100%; max-width: 450px; border-radius: 12px; display: block; margin: 0 auto 25px auto; box-shadow: var(--box-shadow); border: 2px solid #fff; }
+
+        /* Admin Dashboard & General UI */
+        .dash-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .card { padding: 20px; border-radius: var(--border-radius); color: #fff; box-shadow: var(--box-shadow); text-align: center; transition: 0.3s; cursor: pointer;}
+        .card:hover { transform: translateY(-5px); filter: brightness(1.1); }
+        .card h3 { font-size: 32px; margin-bottom: 5px; font-weight: 800;}
+        .c-blue { background: linear-gradient(135deg, #0056b3, #00aaff); }
+        .c-green { background: linear-gradient(135deg, #28a745, #5cd675); }
+        .c-orange { background: linear-gradient(135deg, #fd7e14, #ffb366); }
+        .c-red { background: linear-gradient(135deg, #dc3545, #ff6b7a); }
+        .c-purple { background: linear-gradient(135deg, #6f42c1, #b388ff); }
+
+        /* Tables */
+        .table-responsive { overflow-x: auto; background: #fff; border-radius: var(--border-radius); padding: 15px; box-shadow: var(--box-shadow); margin-bottom: 20px;}
+        table { width: 100%; border-collapse: collapse; white-space: nowrap; }
+        table th, table td { padding: 12px 15px; border-bottom: 1px solid #eee; text-align: right; }
+        table th { background: var(--primary-blue); color: #fff; font-weight: bold; }
+        table tr:hover td { background-color: #f8f9fa; }
+        
+        .status-badge { padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; color: #fff; display: inline-block;}
+        .bg-green { background: var(--success-green); }
+        .bg-orange { background: var(--warning-orange); }
+        .bg-red { background: var(--danger-red); }
+        .bg-blue { background: var(--primary-blue); }
+        .bg-gray { background: #6c757d; }
+        .bg-dark { background: #343a40; }
+
+        .btn-action { padding: 6px 12px; border: none; border-radius: 5px; cursor: pointer; color: #fff; font-size: 13px; margin: 2px; font-weight: bold; transition: 0.2s;}
+        .btn-action:hover { opacity: 0.8; }
+
+        /* Admin Tabs */
+        .admin-tabs { display: flex; gap: 10px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 5px;}
+        .admin-tabs::-webkit-scrollbar { height: 5px; }
+        .admin-tabs::-webkit-scrollbar-thumb { background: #ccc; border-radius: 5px; }
+        .admin-tabs button { padding: 10px 20px; border: none; background: #e9ecef; border-radius: 5px; cursor: pointer; font-weight: bold; white-space: nowrap; transition: 0.3s; color: #555;}
+        .admin-tabs button.active { background: var(--primary-blue); color: #fff; box-shadow: 0 3px 8px rgba(0,86,179,0.3);}
+        .admin-tab-content { display: none; }
+        .admin-tab-content.active { display: block; animation: fadeIn 0.3s ease;}
+
+        /* Dual Language Inputs */
+        .dual-input { display: flex; gap: 15px; }
+        .dual-input .form-group { flex: 1; }
+        .ar-label::after { content: ' (العربية)'; color: #888; font-size: 12px; margin-right: 5px; font-weight: normal;}
+        .fr-label::after { content: ' (Français)'; color: #888; font-size: 12px; margin-right: 5px; font-weight: normal;}
+
+        /* Login Screen */
+        .login-container { max-width: 480px; margin: 40px auto; background: #fff; padding: 35px 30px; border-radius: 12px; box-shadow: var(--box-shadow); border-top: 4px solid var(--primary-blue);}
+
+        /* Professional Pricing Plans Styles */
+        .pricing-plans { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;}
+        .plan-card { 
+            flex: 1; min-width: 100px; padding: 18px 10px; border-radius: 12px; text-align: center; cursor: pointer; transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); 
+            background: linear-gradient(135deg, var(--primary-blue), var(--primary-dark)); 
+            border: 2px solid transparent; box-shadow: 0 4px 10px rgba(0,0,0,0.15); position: relative;
+        }
+        .plan-card:hover { transform: translateY(-5px); box-shadow: 0 8px 20px rgba(0,86,179,0.3); }
+        .plan-card:active { transform: scale(0.95); } 
+        .plan-card.active-plan { 
+            border: 2px solid #FFD700; transform: scale(1.05); 
+            box-shadow: 0 8px 25px rgba(0,0,0,0.4); 
+            background: linear-gradient(135deg, var(--primary-dark), #001f4d);
+        }
+        .plan-card h4 { margin-bottom: 5px; color: #fff; font-size: 15px; font-weight: bold;}
+        .plan-card p { font-weight: 900; color: #FFD700; font-size: 18px; margin: 0;}
+        .plan-card.active-plan::before {
+            content: '\f00c'; font-family: "Font Awesome 6 Free"; font-weight: 900;
+            position: absolute; top: 8px; right: 8px; color: #FFD700; font-size: 14px;
+        }
+        
+        .table-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px; background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #eee;}
+        .search-box { padding: 10px 15px; border: 1px solid #ccc; border-radius: 20px; outline: none; width: 100%; max-width: 300px; font-family: 'Cairo'; transition: 0.3s;}
+        .search-box:focus { border-color: var(--primary-blue); box-shadow: 0 0 5px rgba(0,86,179,0.2);}
+        .btn-export { background: #17a2b8; color: #fff; border: none; padding: 8px 15px; border-radius: 20px; cursor: pointer; font-weight: bold; display: flex; align-items: center; gap: 5px; transition: 0.3s;}
+        .btn-export:hover { background: #138496; }
+
+        [dir="ltr"] table th, [dir="ltr"] table td { text-align: left; }
+        [dir="ltr"] .ar-label::after { margin-left: 5px; margin-right: 0;}
+        [dir="ltr"] .fr-label::after { margin-left: 5px; margin-right: 0;}
+        
+        /* Mobile Adjustments */
+        @media(max-width: 768px) {
+            .header { padding: 12px 15px; }
+            .menu-btn { width: 35px; height: 35px; font-size: 18px;}
+            .main-content { padding: 10px; }
+            .cheque-card { padding: 15px; }
+            .cheque-info p { font-size: 14px; }
+            .cheque-value { font-size: 16px; }
+            .dual-input { flex-direction: column; gap: 0; }
+            .admin-tabs button { padding: 8px 15px; font-size: 14px;}
+            .main-logo-anim { font-size: 35px; }
+            .main-title-text { font-size: 20px; }
+            .draw-check { width: 35px; height: 35px; }
+            .plan-card { min-width: 45%; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Initial Loader Animation -->
+<div id="initialLoader" class="initial-loader">
+    <div class="main-logo-anim">
+        <svg class="draw-check" viewBox="0 0 52 52">
+            <circle class="draw-check-circle" cx="26" cy="26" r="25" fill="none"/>
+            <path class="draw-check-path" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+        </svg>
+        Prouver
+    </div>
+</div>
+
+<div class="app-container">
+    <div id="sidebarOverlay" class="sidebar-overlay" onclick="toggleMenu()"></div>
+
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-logo">
+            <i class="fas fa-check-circle"></i>Prouver
+        </div>
+        <nav id="sidebarMenu">
+            <a onclick="navigate('home'); toggleMenu();" data-i18n="nav_home"><i class="fas fa-shield-alt" style="width:25px; color:var(--primary-blue);"></i> تأكيد الدفع</a>
+            <a onclick="navigate('about'); toggleMenu();" data-i18n="nav_about"><i class="fas fa-info-circle" style="width:25px; color:var(--primary-blue);"></i> من نحن</a>
+            <a onclick="navigate('privacy'); toggleMenu();" data-i18n="nav_privacy"><i class="fas fa-user-shield" style="width:25px; color:var(--primary-blue);"></i> سياسة الخصوصية</a>
+            <a onclick="openReportModal(); toggleMenu();" data-i18n="nav_report"><i class="fas fa-exclamation-triangle" style="width:25px; color:var(--primary-blue);"></i> الإبلاغ عن مشكل</a>
+            <a onclick="navigate('commercial'); toggleMenu();" data-i18n="nav_commercial"><i class="fas fa-store" style="width:25px; color:var(--primary-blue);"></i> حساب تجاري</a>
+            <a onclick="navigate('admin_login'); toggleMenu();" id="adminLink" style="display:none;"><i class="fas fa-tachometer-alt" style="width:25px; color:var(--primary-blue);"></i> لوحة التحكم</a>
+            <a onclick="logout(); toggleMenu();" id="logoutLink" style="display:none; color: var(--danger-red); border-top: 1px solid #eee; margin-top: 10px;" data-i18n="nav_logout"><i class="fas fa-sign-out-alt" style="width:25px; color:var(--primary-blue);"></i> تسجيل خروج</a>
+        </nav>
+    </aside>
+
+    <main class="main-content">
+        <header class="header">
+            <div class="header-left">
+                <button class="menu-btn" onclick="toggleMenu()"><i class="fas fa-bars"></i></button>
+            </div>
+            <div class="lang-switch">
+                <button onclick="changeLanguage('ar')" id="btn-ar" class="active">AR</button>
+                <button onclick="changeLanguage('fr')" id="btn-fr">FR</button>
+            </div>
+        </header>
+
+        <!-- VIEW 1: Home (Payment Form) -->
+        <section id="view-home" class="view-section active">
+            
+            <div class="main-animated-header">
+                <div class="main-logo-anim">
+                    <svg class="draw-check" viewBox="0 0 52 52">
+                        <circle class="draw-check-circle" cx="26" cy="26" r="25" fill="none"/>
+                        <path class="draw-check-path" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+                    </svg>
+                    Prouver
+                </div>
+                <h2 class="main-title-text" id="mainPageTitle" data-i18n="title_payment">تأكيد الدفع Payment</h2>
+            </div>
+
+            <img src="https://play-lh.googleusercontent.com/4yxUE_wg_ljg1BRyO7BQ8l3siAyQZSeGx17OKyo0Y2Htt9A5oJEC7-zW0p4opjIbWQ=w600-h300-pc0xffffff-pd" alt="Algérie Poste" class="alg-poste-img">
+            
+            <div class="cheque-card">
+                <div class="cheque-header-text">Information de Paiement / معلومات الدفع</div>
+                <div class="cheque-info">
+                    <p><span data-i18n="chq_name">الاسم الكامل:</span> <span id="pub-name" class="cheque-value">---</span></p>
+                    <p>
+                        <span data-i18n="chq_rip">رقم الحساب (RIP):</span> 
+                        <span id="pub-rip" class="cheque-value" style="font-family: monospace; letter-spacing: 2px; direction: ltr; display: inline-block;">---</span>
+                        <button class="copy-btn" onclick="copyRIP()" title="نسخ الرقم"><i class="fas fa-copy"></i> <span data-i18n="btn_copy">نسخ</span></button>
+                    </p>
+                    <p><span data-i18n="chq_address">العنوان:</span> <span id="pub-address" class="cheque-value" style="font-size:14px;">---</span></p>
+                </div>
+            </div>
+
+            <div class="form-container">
+                <form id="paymentForm">
+                    <div class="form-group">
+                        <label data-i18n="frm_name">الاسم الكامل</label>
+                        <input type="text" id="pay_name" class="form-control" data-i18n-placeholder="pl_name" placeholder="الاسم واللقب..." required>
+                    </div>
+                    <div class="dual-input">
+                        <div class="form-group">
+                            <label data-i18n="frm_phone">رقم الهاتف</label>
+                            <input type="tel" id="pay_phone" class="form-control" data-i18n-placeholder="pl_phone" placeholder="05/06/07..." required>
+                        </div>
+                        <div class="form-group">
+                            <label data-i18n="frm_wilaya">الولاية</label>
+                            <input type="text" id="pay_wilaya" class="form-control" data-i18n-placeholder="pl_wilaya" placeholder="مثال: الجزائر العاصمة" required>
+                        </div>
+                    </div>
+                    <div class="dual-input">
+                        <div class="form-group">
+                            <label data-i18n="frm_rip">رقم الحساب البريدي المرسل منه</label>
+                            <input type="text" id="pay_rip" class="form-control" data-i18n-placeholder="pl_rip" placeholder="RIP الخاص بك" required>
+                        </div>
+                        <div class="form-group">
+                            <label data-i18n="frm_course">اسم الدورة / الخدمة</label>
+                            <input type="text" id="pay_course" class="form-control" data-i18n-placeholder="pl_course" placeholder="ما الذي دفعت ثمنه؟" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label data-i18n="frm_receipt"><i class="fas fa-cloud-upload-alt"></i> رفع إثبات الدفع (Reçu)</label>
+                        <input type="file" id="pay_file" class="form-control" accept="image/*,.pdf" style="padding: 9px;" required>
+                    </div>
+                    <button type="submit" class="btn-submit" id="btn_submit_pay">
+                        <i class="fas fa-check-circle"></i> <span data-i18n="btn_confirm">تأكيد الدفع</span>
+                    </button>
+                </form>
+                <div class="disclaimer">
+                    <i class="fas fa-shield-alt"></i> <span data-i18n="txt_disclaimer">سيتم التأكد من طلبكم في ظرف 24 سا إلى 48 سا، سنتصل بكم فور التأكد من أن دفعكم صحيح.</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- VIEW: About & Privacy -->
+        <section id="view-text" class="view-section">
+            <div id="textContent"></div>
+        </section>
+
+        <!-- VIEW: Commercial Account Auth -->
+        <section id="view-commercial" class="view-section">
+            <div class="login-container">
+                <div style="text-align:center; margin-bottom:20px;">
+                    <i class="fas fa-store" style="font-size:40px; color:var(--primary-blue); margin-bottom:10px;"></i>
+                    <h3 style="color:var(--primary-blue);" data-i18n="nav_commercial">حساب تجاري</h3>
+                </div>
+                <div class="admin-tabs" style="justify-content: center; margin-bottom:25px;">
+                    <button onclick="toggleCommAuth('login')" data-i18n="btn_login">تسجيل الدخول</button>
+                    <button class="active" onclick="toggleCommAuth('register')" data-i18n="btn_register">إنشاء حساب</button>
+                </div>
+                
+                <form id="commLoginForm" class="admin-tab-content">
+                    <div class="form-group"><label>Email</label><input type="email" id="cl_email" class="form-control" required></div>
+                    <div class="form-group"><label>Password</label><input type="password" id="cl_pass" class="form-control" required></div>
+                    <button type="submit" class="btn-submit"><i class="fas fa-sign-in-alt"></i> <span data-i18n="btn_login">دخول</span></button>
+                </form>
+
+                <form id="commRegForm" class="admin-tab-content active">
+                    <label style="display:block; margin-bottom:8px; font-weight:bold; color:#444;" data-i18n="txt_choose_plan">اختر خطة الاشتراك:</label>
+                    <div class="pricing-plans">
+                        <div class="plan-card active-plan" onclick="selectPlan('1', this)"><h4 data-i18n="plan_1">1 شهر</h4><p data-i18n="price_1">2000 دج</p></div>
+                        <div class="plan-card" onclick="selectPlan('3', this)"><h4 data-i18n="plan_3">3 أشهر</h4><p data-i18n="price_3">4500 دج</p></div>
+                        <div class="plan-card" onclick="selectPlan('6', this)"><h4 data-i18n="plan_6">6 أشهر</h4><p data-i18n="price_6">6500 دج</p></div>
+                        <div class="plan-card" onclick="selectPlan('12', this)"><h4 data-i18n="plan_12">12 شهر</h4><p data-i18n="price_12">10000 دج</p></div>
+                    </div>
+                    <input type="hidden" id="cr_plan" value="1" required>
+
+                    <div class="form-group"><label data-i18n="frm_name">الاسم الكامل</label><input type="text" id="cr_name" class="form-control" required></div>
+                    <div class="form-group"><label data-i18n="frm_phone">رقم الهاتف</label><input type="text" id="cr_phone" class="form-control" required></div>
+                    <div class="form-group"><label>Email</label><input type="email" id="cr_email" class="form-control" required></div>
+                    <div class="form-group"><label data-i18n="frm_company">اسم الشركة / المؤسسة</label><input type="text" id="cr_company" class="form-control" required></div>
+                    <div class="form-group"><label>Password</label><input type="password" id="cr_pass" class="form-control" required></div>
+                    <button type="submit" class="btn-submit"><i class="fas fa-user-plus"></i> <span data-i18n="btn_register">إنشاء</span></button>
+                </form>
+            </div>
+        </section>
+
+        <!-- VIEW: Admin Login -->
+        <section id="view-admin_login" class="view-section">
+            <div class="login-container" style="border-top-color: var(--danger-red);">
+                <div style="text-align:center; margin-bottom:25px;">
+                    <i class="fas fa-user-shield" style="font-size:45px; color:var(--danger-red); margin-bottom:10px;"></i>
+                    <h3 style="color:var(--danger-red);">Admin Secure Access</h3>
+                    <p style="font-size: 12px; color: #777;">برمجة خاصة لا تخضع لمصادقة الإيميل</p>
+                </div>
+                <form id="adminLoginForm">
+                    <div class="form-group">
+                        <label>Username (اسم المستخدم)</label>
+                        <input type="text" id="admin_user" class="form-control" required autocomplete="off">
+                    </div>
+                    <div class="form-group">
+                        <label>Password Token (الرمز السري)</label>
+                        <input type="password" id="admin_pass" class="form-control" required autocomplete="off">
+                    </div>
+                    <button type="submit" class="btn-submit bg-red" style="background: var(--danger-red);"><i class="fas fa-lock-open"></i> Access Dashboard</button>
+                </form>
+            </div>
+        </section>
+
+        <!-- VIEW: Dashboard (Admin & Commercial) -->
+        <section id="view-dashboard" class="view-section">
+            <div class="dash-cards">
+                <div class="card c-blue" onclick="openFilteredTab('payments', 'pending')"> <h3 id="st_new">0</h3> <p data-i18n="st_new">دفعات جديدة</p> </div>
+                <div class="card c-green" onclick="openFilteredTab('payments', 'all')"> <h3 id="st_all">0</h3> <p data-i18n="st_all">جميع الدفعات</p> </div>
+                <div class="card c-orange" onclick="openFilteredTab('reports', 'all')"> <h3 id="st_rep">0</h3> <p data-i18n="st_rep">الإبلاغات</p> </div>
+                <div class="card c-red" onclick="openFilteredTab('failed', 'all')"> <h3 id="st_fail">0</h3> <p data-i18n="st_fail">دفع فاشل</p> </div>
+                <div class="card c-purple admin-only" onclick="openFilteredTab('accounts', 'all')"> <h3 id="st_comm">0</h3> <p data-i18n="st_comm">حساب تجاري</p> </div>
+                <div class="card bg-dark commercial-only" style="display:none;"> <h3 id="st_days_left">0</h3> <p data-i18n="st_days">أيام متبقية</p> </div>
+            </div>
+
+            <div id="companyUrlContainer" style="display:none; background:#e9ecef; padding:15px; border-radius:8px; margin-bottom:20px; text-align:center; font-weight:bold; border: 1px dashed var(--primary-blue);">
+                <i class="fas fa-link" style="color:var(--primary-blue);"></i> <span data-i18n="txt_share_link">رابط الدفع الخاص بشركتك لمشاركته مع العملاء:</span><br> 
+                <a href="#" id="companyLink" target="_blank" style="color:var(--primary-blue); font-size:18px; display:inline-block; margin-top:5px; direction:ltr;"></a>
+            </div>
+
+            <div class="admin-tabs">
+                <button class="tab-btn active" onclick="switchDashTab('payments')" data-i18n="tab_pay"><i class="fas fa-money-check-alt"></i> قسم الدفعات</button>
+                <button class="tab-btn" onclick="switchDashTab('failed')" data-i18n="tab_fail"><i class="fas fa-times-circle"></i> الدفع الفاشل</button>
+                <button class="tab-btn" onclick="switchDashTab('reports')" data-i18n="tab_rep"><i class="fas fa-envelope-open-text"></i> الابلاغات</button>
+                <button class="tab-btn admin-only" onclick="switchDashTab('accounts')" data-i18n="tab_acc"><i class="fas fa-users"></i> الحسابات</button>
+                <button class="tab-btn" onclick="switchDashTab('settings')" data-i18n="tab_set"><i class="fas fa-cogs"></i> قسم المعلومات</button>
+            </div>
+
+            <!-- Payments Tab -->
+            <div id="tab-payments" class="admin-tab-content active">
+                <div class="table-toolbar">
+                    <input type="text" id="searchPay" class="search-box" data-i18n-placeholder="pl_search_pay" placeholder="ابحث عن اسم، هاتف، دورة..." onkeyup="filterTable('searchPay', 'tbl_payments')">
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn-export bg-red" style="background:var(--danger-red);" onclick="deleteSelected('payments', 'tbl_payments')"><i class="fas fa-trash"></i> <span data-i18n="btn_delete">حذف المحدد</span></button>
+                        <button class="btn-export" onclick="exportData('main_tbl_pay', 'المدفوعات')"><i class="fas fa-file-csv"></i> <span data-i18n="btn_csv">تحميل CSV</span></button>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table id="main_tbl_pay">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px;"><input type="checkbox" onchange="toggleSelectAll('tbl_payments', this)"></th>
+                                <th data-i18n="th_date">الوقت والتاريخ</th> <th data-i18n="th_name">الاسم</th> <th data-i18n="th_wilaya">الولاية</th> <th>RIP</th> <th data-i18n="th_course">الدورة</th> <th data-i18n="th_phone">الهاتف</th> <th>Reçu</th> <th data-i18n="th_duration">المدة</th> <th data-i18n="th_action">الحالة / إجراء</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbl_payments"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Failed Tab -->
+            <div id="tab-failed" class="admin-tab-content">
+                <div class="table-toolbar">
+                    <input type="text" id="searchFail" class="search-box" data-i18n-placeholder="pl_search_fail" placeholder="ابحث عن اسم، دورة..." onkeyup="filterTable('searchFail', 'tbl_failed')">
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn-export bg-red" style="background:var(--danger-red);" onclick="deleteSelected('payments', 'tbl_failed')"><i class="fas fa-trash"></i> <span data-i18n="btn_delete">حذف المحدد</span></button>
+                        <button class="btn-export" onclick="exportData('main_tbl_fail', 'الدفع_الفاشل')"><i class="fas fa-file-csv"></i> <span data-i18n="btn_csv">تحميل CSV</span></button>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table id="main_tbl_fail">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px;"><input type="checkbox" onchange="toggleSelectAll('tbl_failed', this)"></th>
+                                <th data-i18n="th_date">الوقت والتاريخ</th> <th data-i18n="th_name">الاسم</th> <th data-i18n="th_course">الدورة</th> <th>Reçu</th> <th data-i18n="th_status">الحالة</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbl_failed"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Reports Tab -->
+            <div id="tab-reports" class="admin-tab-content">
+                <div class="table-toolbar">
+                    <div></div> <!-- Spacer -->
+                    <button class="btn-export bg-red" style="background:var(--danger-red);" onclick="deleteSelected('reports', 'tbl_reports')"><i class="fas fa-trash"></i> <span data-i18n="btn_delete">حذف المحدد</span></button>
+                </div>
+                <div class="table-responsive">
+                    <table id="main_tbl_rep">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px;"><input type="checkbox" onchange="toggleSelectAll('tbl_reports', this)"></th>
+                                <th data-i18n="th_date">التاريخ</th> <th data-i18n="th_name">الاسم</th> <th data-i18n="th_phone">الهاتف</th> <th>Email</th> <th data-i18n="th_desc">الوصف</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbl_reports"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Accounts Tab (Admin Only) -->
+            <div id="tab-accounts" class="admin-tab-content admin-only">
+                <h4 style="margin-bottom:15px; color:var(--primary-blue);"><i class="fas fa-user-clock"></i> <span data-i18n="acc_req_title">طلبات حسابات تجارية (جديدة / تفعيل)</span></h4>
+                <div class="table-responsive" style="margin-bottom:25px;">
+                    <table>
+                        <thead><tr><th data-i18n="th_company">الشركة</th><th data-i18n="th_name">الاسم</th><th data-i18n="th_email">البريد</th><th data-i18n="th_phone">الهاتف</th><th data-i18n="th_sub_chosen">الاشتراك المختار</th><th data-i18n="th_type">النوع</th><th data-i18n="th_action">إجراء</th></tr></thead>
+                        <tbody id="tbl_acc_req"></tbody>
+                    </table>
+                </div>
+                <h4 style="margin-bottom:15px; color:var(--success-green);"><i class="fas fa-user-check"></i> <span data-i18n="acc_act_title">حسابات تجارية نشطة و منتهية</span></h4>
+                <div class="table-responsive">
+                    <table>
+                        <thead><tr><th data-i18n="th_company">الشركة</th><th data-i18n="th_admin">المسؤول</th><th data-i18n="th_email">البريد</th><th data-i18n="th_phone">الهاتف</th><th data-i18n="th_sub">الاشتراك</th><th data-i18n="th_days_left">الأيام المتبقية</th><th data-i18n="th_link">الرابط المخصص</th><th data-i18n="th_action">إجراء</th></tr></thead>
+                        <tbody id="tbl_acc_active"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div id="tab-settings" class="admin-tab-content">
+                <div class="form-container">
+                    <form id="settingsForm">
+                        <h4 style="margin-bottom:20px; color:var(--primary-blue); border-bottom:2px solid #eee; padding-bottom:10px;"><i class="fas fa-money-check"></i> <span data-i18n="set_title_chq">معلومات الدفع (الشيك الذي يظهر للعملاء)</span></h4>
+                        <div class="dual-input">
+                            <div class="form-group"><label class="ar-label">الاسم الكامل</label><input type="text" id="set_name_ar" class="form-control"></div>
+                            <div class="form-group"><label class="fr-label">Nom Complet</label><input type="text" id="set_name_fr" class="form-control"></div>
+                        </div>
+                        <div class="form-group"><label>رقم الحساب البريدي (RIP)</label><input type="text" id="set_rip" class="form-control" style="font-family: monospace; font-size:16px; direction:ltr; display:block;"></div>
+                        <div class="dual-input">
+                            <div class="form-group"><label class="ar-label">العنوان</label><input type="text" id="set_address_ar" class="form-control"></div>
+                            <div class="form-group"><label class="fr-label">Adresse</label><input type="text" id="set_address_fr" class="form-control"></div>
+                        </div>
+                        
+                        <div class="admin-only">
+                            <h4 style="margin:30px 0 20px 0; color:var(--primary-blue); border-bottom:2px solid #eee; padding-bottom:10px;"><i class="fas fa-globe"></i> إعدادات اللغة (Default Language)</h4>
+                            <div class="form-group">
+                                <select id="set_default_lang" class="form-control">
+                                    <option value="ar">العربية (Arabic)</option>
+                                    <option value="fr">الفرنسية (Français)</option>
+                                </select>
+                            </div>
+
+                            <h4 style="margin:30px 0 20px 0; color:var(--primary-blue); border-bottom:2px solid #eee; padding-bottom:10px;"><i class="fas fa-file-alt"></i> محتوى صفحات النظام</h4>
+                            <div class="dual-input">
+                                <div class="form-group"><label class="ar-label">من نحن</label><textarea id="set_about_ar" class="form-control" rows="4"></textarea></div>
+                                <div class="form-group"><label class="fr-label">À propos</label><textarea id="set_about_fr" class="form-control" rows="4"></textarea></div>
+                            </div>
+                            <div class="dual-input">
+                                <div class="form-group"><label class="ar-label">سياسة الخصوصية</label><textarea id="set_priv_ar" class="form-control" rows="4"></textarea></div>
+                                <div class="form-group"><label class="fr-label">Politique de confidentialité</label><textarea id="set_priv_fr" class="form-control" rows="4"></textarea></div>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn-submit" style="width:auto; margin-top:15px;"><i class="fas fa-save"></i> <span data-i18n="btn_save">حفظ التغييرات</span></button>
+                    </form>
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+</div>
+
+<template id="reportTemplate">
+    <input type="text" id="rep_name" class="swal2-input" placeholder="الاسم / Nom">
+    <input type="email" id="rep_email" class="swal2-input" placeholder="الإيمايل / Email">
+    <input type="tel" id="rep_phone" class="swal2-input" placeholder="رقم الهاتف / Téléphone">
+    <textarea id="rep_desc" class="swal2-textarea" placeholder="وصف المشكل بدقة / Description détaillée"></textarea>
+</template>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs, updateDoc, doc, setDoc, getDoc, query, where, serverTimestamp, onSnapshot, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    
+    const firebaseConfig = {
+        apiKey: "AIzaSyBPMJ3vkjIThlGyBTKKZ44BpV0mTaT9U4Q",
+        authDomain: "prouver-online.firebaseapp.com",
+        projectId: "prouver-online",
+        storageBucket: "prouver-online.firebasestorage.app",
+        messagingSenderId: "1096088177753",
+        appId: "1:1096088177753:web:63511df2788c11597b7548",
+        measurementId: "G-Z18GZY5YF8"
+    };
+
+    let app, db;
+    let isFirebaseReady = false;
+
+    try {
+        app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        isFirebaseReady = true;
+        console.log("Firebase initialized");
+    } catch (e) {
+        console.warn("Firebase initialization failed, using LocalStorage fallback.", e);
+    }
+
+    (function() {
+        
+        const state = {
+            lang: 'ar',
+            role: 'guest', 
+            companyId: null,
+            targetCompany: 'default' 
+        };
+
+        const planDays = { '1': 30, '3': 90, '6': 180, '12': 365 };
+
+        window.toggleMenu = () => {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('active');
+        };
+
+        window.copyRIP = () => {
+            const ripText = document.getElementById('pub-rip').innerText;
+            if(ripText === '---' || ripText === '' || ripText === '...') return;
+            navigator.clipboard.writeText(ripText).then(() => {
+                const msg = state.lang === 'ar' ? 'تم نسخ رقم الحساب بنجاح!' : 'RIP copié avec succès!';
+                Swal.fire({
+                    icon: 'success', title: msg, toast: true, position: 'top-end',
+                    showConfirmButton: false, timer: 2000, timerProgressBar: true
+                });
+            });
+        };
+
+        const i18n = {
+            ar: {
+                nav_home: "تأكيد الدفع", nav_about: "من نحن", nav_privacy: "سياسة الخصوصية", nav_report: "الإبلاغ عن مشكل", nav_commercial: "حساب تجاري", nav_logout: "تسجيل خروج",
+                title_payment: "تأكيد الدفع Payment",
+                chq_name: "الاسم الكامل:", chq_rip: "رقم الحساب (RIP):", chq_address: "العنوان:", btn_copy: "نسخ",
+                frm_name: "الاسم الكامل", frm_phone: "رقم الهاتف", frm_wilaya: "الولاية", frm_rip: "رقم الحساب البريدي المرسل منه", frm_course: "اسم الدورة / الخدمة", frm_receipt: "رفع إثبات الدفع (Reçu)", frm_company: "اسم الشركة / المؤسسة",
+                btn_confirm: "تأكيد الدفع", btn_login: "تسجيل الدخول", btn_register: "إنشاء حساب", btn_save: "حفظ التغييرات", btn_csv: "تحميل CSV", btn_delete: "حذف المحدد",
+                txt_disclaimer: "سيتم التأكد من طلبكم في ظرف 24 سا إلى 48 سا، سنتصل بكم فور التأكد من أن دفعكم صحيح.",
+                msg_success: "تم إرسال إثبات الدفع بنجاح!", msg_report: "تم إرسال طلبك بنجاح", msg_reg_wait: "تم التسجيل بنجاح، انتظر موافقة فريق Prouver على طلبك، سنتصل بك قريباً.",
+                st_new: "دفعات جديدة", st_all: "جميع الدفعات", st_rep: "الإبلاغات", st_fail: "دفع فاشل", st_comm: "حساب تجاري", st_days: "أيام متبقية",
+                tab_pay: "قسم الدفعات", tab_fail: "الدفع الفاشل", tab_rep: "الابلاغات", tab_acc: "الحسابات", tab_set: "قسم المعلومات",
+                txt_choose_plan: "اختر خطة الاشتراك:", plan_1: "1 شهر", plan_3: "3 أشهر", plan_6: "6 أشهر", plan_12: "12 شهر",
+                price_1: "2000 دج", price_3: "4500 دج", price_6: "6500 دج", price_12: "10000 دج",
+                txt_share_link: "رابط الدفع الخاص بشركتك لمشاركته مع العملاء:",
+                th_date: "الوقت والتاريخ", th_name: "الاسم", th_wilaya: "الولاية", th_course: "الدورة", th_phone: "الهاتف", th_duration: "المدة", th_action: "الحالة / إجراء", th_status: "الحالة", th_desc: "الوصف",
+                set_title_chq: "معلومات الدفع (الشيك الذي يظهر للعملاء)",
+                pl_name: "الاسم واللقب...", pl_phone: "05/06/07...", pl_wilaya: "مثال: الجزائر العاصمة", pl_rip: "RIP الخاص بك", pl_course: "ما الذي دفعت ثمنه؟", pl_search_pay: "ابحث عن اسم، هاتف، دورة...", pl_search_fail: "ابحث عن اسم، دورة...",
+                acc_req_title: "طلبات حسابات تجارية (جديدة / تفعيل)", acc_act_title: "حسابات تجارية نشطة و منتهية", th_company: "الشركة", th_admin: "المسؤول", th_email: "البريد", th_sub_chosen: "الاشتراك المختار", th_sub: "الاشتراك", th_type: "النوع", th_days_left: "الأيام المتبقية", th_link: "الرابط المخصص", txt_month: "شهر", txt_months: "أشهر", badge_new: "جديد", badge_renew: "تجديد", btn_approve: "موافق", btn_reject: "رفض", badge_banned: "محظور", badge_expired: "منتهي", txt_day: "يوم", btn_unban: "فك الحظر", btn_ban: "حظر", txt_store_link: "رابط المتجر"
+            },
+            fr: {
+                nav_home: "Confirmer Paiement", nav_about: "À propos", nav_privacy: "Politique de conf.", nav_report: "Signaler un prob.", nav_commercial: "Compte Commercial", nav_logout: "Déconnexion",
+                title_payment: "Confirmation de Paiement",
+                chq_name: "Nom Complet:", chq_rip: "Numéro de Compte (RIP):", chq_address: "Adresse:", btn_copy: "Copier",
+                frm_name: "Nom Complet", frm_phone: "Téléphone", frm_wilaya: "Wilaya", frm_rip: "RIP de l'expéditeur", frm_course: "Nom de la formation", frm_receipt: "Télécharger le reçu", frm_company: "Nom de l'entreprise",
+                btn_confirm: "Confirmer Paiement", btn_login: "Se Connecter", btn_register: "S'inscrire", btn_save: "Sauvegarder", btn_csv: "Télécharger CSV", btn_delete: "Supprimer",
+                txt_disclaimer: "Votre demande sera vérifiée dans 24h à 48h. Nous vous contacterons dès confirmation.",
+                msg_success: "Preuve envoyée avec succès!", msg_report: "Votre demande a été envoyée.", msg_reg_wait: "Inscription réussie, attendez l'approbation de l'équipe Prouver. Nous vous contacterons bientôt.",
+                st_new: "Nouveaux Paiements", st_all: "Tous Paiements", st_rep: "Signalements", st_fail: "Échoués", st_comm: "Comptes Com.", st_days: "Jours Restants",
+                tab_pay: "Paiements", tab_fail: "Échoués", tab_rep: "Signalements", tab_acc: "Comptes", tab_set: "Paramètres",
+                txt_choose_plan: "Choisissez un forfait:", plan_1: "1 Mois", plan_3: "3 Mois", plan_6: "6 Mois", plan_12: "12 Mois",
+                price_1: "2000 DA", price_3: "4500 DA", price_6: "6500 DA", price_12: "10000 DA",
+                txt_share_link: "Lien de paiement de votre entreprise à partager:",
+                th_date: "Date et Heure", th_name: "Nom", th_wilaya: "Wilaya", th_course: "Formation", th_phone: "Téléphone", th_duration: "Durée", th_action: "Statut / Action", th_status: "Statut", th_desc: "Description",
+                set_title_chq: "Informations de paiement (Chèque affiché aux clients)",
+                pl_name: "Nom et Prénom...", pl_phone: "05/06/07...", pl_wilaya: "Ex: Alger", pl_rip: "Votre RIP", pl_course: "Qu'avez-vous payé?", pl_search_pay: "Chercher nom, téléphone...", pl_search_fail: "Chercher nom, formation...",
+                acc_req_title: "Demandes de comptes commerciaux (Nouveau / Activation)", acc_act_title: "Comptes commerciaux actifs et expirés", th_company: "Entreprise", th_admin: "Admin", th_email: "Email", th_sub_chosen: "Abonnement choisi", th_sub: "Abonnement", th_type: "Type", th_days_left: "Jours restants", th_link: "Lien personnalisé", txt_month: "Mois", txt_months: "Mois", badge_new: "Nouveau", badge_renew: "Renouv.", btn_approve: "Approuver", btn_reject: "Rejeter", badge_banned: "Banni", badge_expired: "Expiré", txt_day: "Jour", btn_unban: "Débloquer", btn_ban: "Bannir", txt_store_link: "Lien du magasin"
+            }
+        };
+
+        const defaultSettings = {
+            default: {
+                ar: { name: "مؤسسة بروفر", address: "الجزائر العاصمة", about: "نحن مؤسسة...", priv: "سياسة الخصوصية..." },
+                fr: { name: "Prouver Entreprise", address: "Alger, Algérie", about: "Nous sommes...", priv: "Politique..." },
+                rip: "0000000000",
+                defaultLang: "ar"
+            }
+        };
+        if(!localStorage.getItem('prouver_settings')) localStorage.setItem('prouver_settings', JSON.stringify(defaultSettings));
+        if(!localStorage.getItem('prouver_db')) localStorage.setItem('prouver_db', JSON.stringify({ payments:[], reports:[], accounts:[] }));
+
+        async function saveData(collectionName, data) {
+            data.timestamp = Date.now();
+            data.companyId = state.targetCompany; 
+            
+            if (isFirebaseReady) {
+                try {
+                    await addDoc(collection(db, collectionName), data);
+                    return true;
+                } catch(e) { console.error("FB Save Error", e); }
+            }
+            let ldb = JSON.parse(localStorage.getItem('prouver_db'));
+            data.id = 'id_' + Date.now();
+            ldb[collectionName].push(data);
+            localStorage.setItem('prouver_db', JSON.stringify(ldb));
+            return true;
+        }
+
+        window.changeLanguage = (lang) => {
+            state.lang = lang;
+            document.documentElement.lang = lang;
+            document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+            document.getElementById('btn-ar').className = lang === 'ar' ? 'active' : '';
+            document.getElementById('btn-fr').className = lang === 'fr' ? 'active' : '';
+            
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if(i18n[lang][key]) el.innerHTML = el.innerHTML.replace(el.innerText.trim(), i18n[lang][key]); 
+            });
+
+            document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+                const key = el.getAttribute('data-i18n-placeholder');
+                if(i18n[lang][key]) el.setAttribute('placeholder', i18n[lang][key]);
+            });
+
+            loadPublicSettings();
+            if (state.role !== 'guest') loadDashboardData(true); 
+        };
+
+        window.navigate = (viewId) => {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+            let targetId = (viewId === 'about' || viewId === 'privacy') ? 'view-text' : 'view-' + viewId;
+            let targetEl = document.getElementById(targetId);
+            if(targetEl) targetEl.classList.add('active');
+
+            if(viewId === 'about' || viewId === 'privacy') {
+                const allSets = JSON.parse(localStorage.getItem('prouver_settings'));
+                const targetSets = allSets[state.targetCompany] || allSets['default'];
+                const defaultSets = allSets['default'] || targetSets;
+                
+                let content = targetSets[state.lang] ? targetSets[state.lang][viewId === 'about'? 'about' : 'priv'] : '';
+                
+                if (!content || content.trim() === '') {
+                    content = defaultSets[state.lang] ? defaultSets[state.lang][viewId === 'about'? 'about' : 'priv'] : '';
+                }
+                
+                document.getElementById('textContent').innerHTML = `
+                <div style="border: 2px solid var(--primary-blue); border-radius: 12px; padding: 25px; background: #fff; box-shadow: var(--box-shadow); margin-top: 10px;">
+                    <h3 style="color:var(--primary-blue); border-bottom:2px solid #eee; padding-bottom:10px; margin-bottom:15px;">
+                        <i class="fas ${viewId === 'about' ? 'fa-info-circle' : 'fa-user-shield'}"></i> ${i18n[state.lang]['nav_'+viewId]}
+                    </h3>
+                    <p style="white-space: pre-wrap; color: #444; line-height: 1.8; font-size: 16px;">${content || (state.lang === 'ar' ? 'لا يوجد محتوى حاليا.' : 'Aucun contenu pour le moment.')}</p>
+                </div>`;
+            }
+        };
+
+        async function loadPublicSettings() {
+            const sets = JSON.parse(localStorage.getItem('prouver_settings'));
+            let data = sets[state.targetCompany]; 
+            
+            const updateUI = (d) => {
+                if(d && d[state.lang]) {
+                    document.getElementById('pub-name').innerText = d[state.lang].name || "---";
+                    document.getElementById('pub-rip').innerText = d.rip || "---";
+                    document.getElementById('pub-address').innerText = d[state.lang].address || "---";
+                }
+            };
+            
+            if (data) {
+                updateUI(data);
+            } else if (state.targetCompany === 'default') {
+                updateUI(sets['default']);
+            } else {
+                document.getElementById('pub-name').innerText = "...";
+                document.getElementById('pub-rip').innerText = "...";
+                document.getElementById('pub-address').innerText = "...";
+            }
+
+            if (isFirebaseReady) {
+                try {
+                    let needsSave = false;
+
+                    if (state.targetCompany !== 'default') {
+                        const defSnap = await getDoc(doc(db, "settings", "default"));
+                        if (defSnap.exists()) {
+                            sets['default'] = defSnap.data();
+                            needsSave = true;
+                        }
+                    }
+
+                    const docSnap = await getDoc(doc(db, "settings", state.targetCompany));
+                    if (docSnap.exists()) {
+                        data = docSnap.data();
+                        sets[state.targetCompany] = data;
+                        needsSave = true;
+                        updateUI(data);
+                    } else if (state.targetCompany !== 'default') {
+                        updateUI(sets['default']);
+                    }
+
+                    if (needsSave) {
+                        localStorage.setItem('prouver_settings', JSON.stringify(sets));
+                    }
+                } catch(e) { console.error("Error fetching settings:", e); }
+            }
+        }
+
+        window.addEventListener('hashchange', handleRoute);
+        
+        window.addEventListener('load', () => {
+            let hashStr = window.location.hash;
+            let tempCompany = 'default';
+            if (hashStr.startsWith('#/') && !hashStr.includes('admin#09#')) {
+                tempCompany = hashStr.replace('#/', '');
+            }
+            let setsInit = JSON.parse(localStorage.getItem('prouver_settings')) || {};
+            let tSet = setsInit[tempCompany] || setsInit['default'] || {};
+            let initLang = tSet.defaultLang || (setsInit['default'] ? setsInit['default'].defaultLang : 'ar') || 'ar';
+            
+            changeLanguage(initLang); 
+            
+            const savedAuth = JSON.parse(localStorage.getItem('prouver_auth'));
+            if(savedAuth) {
+                login(savedAuth.companyId, savedAuth.role, true);
+            }
+            
+            handleRoute();        
+            setupRealtimeListeners();
+
+            setTimeout(() => {
+                const loader = document.getElementById('initialLoader');
+                if (loader) {
+                    loader.classList.add('hidden');
+                    setTimeout(() => loader.style.display = 'none', 500);
+                }
+            }, 1000);
+        });
+
+        function setupRealtimeListeners() {
+            if (!isFirebaseReady) return;
+
+            onSnapshot(collection(db, "payments"), (snapshot) => {
+                let dbData = JSON.parse(localStorage.getItem('prouver_db')) || {payments:[], reports:[], accounts:[]};
+                dbData.payments = [];
+                snapshot.forEach(doc => { let d = doc.data(); d.id = doc.id; dbData.payments.push(d); });
+                localStorage.setItem('prouver_db', JSON.stringify(dbData));
+                if (state.role !== 'guest') loadDashboardData(true);
+            });
+
+            onSnapshot(collection(db, "reports"), (snapshot) => {
+                let dbData = JSON.parse(localStorage.getItem('prouver_db')) || {payments:[], reports:[], accounts:[]};
+                dbData.reports = [];
+                snapshot.forEach(doc => { let d = doc.data(); d.id = doc.id; dbData.reports.push(d); });
+                localStorage.setItem('prouver_db', JSON.stringify(dbData));
+                if (state.role !== 'guest') loadDashboardData(true);
+            });
+
+            onSnapshot(collection(db, "accounts"), (snapshot) => {
+                let dbData = JSON.parse(localStorage.getItem('prouver_db')) || {payments:[], reports:[], accounts:[]};
+                dbData.accounts = [];
+                snapshot.forEach(doc => { let d = doc.data(); d.id = doc.id; dbData.accounts.push(d); });
+                localStorage.setItem('prouver_db', JSON.stringify(dbData));
+                if (state.role !== 'guest') loadDashboardData(true);
+            });
+        }
+
+        function handleRoute() {
+            let hash = "";
+            try { hash = decodeURIComponent(window.location.hash); } 
+            catch(e) { hash = window.location.hash; }
+
+            if (hash.includes('admin#09#')) {
+                state.targetCompany = 'default';
+                navigate('admin_login');
+            } else if (hash.startsWith('#/')) {
+                state.targetCompany = hash.replace('#/', ''); 
+                navigate('home');
+                loadPublicSettings();
+            } else {
+                state.targetCompany = 'default';
+                navigate('home');
+                loadPublicSettings();
+            }
+        }
+
+        document.getElementById('paymentForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('btn_submit_pay');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الإرسال...';
+            btn.disabled = true;
+
+            const fileInput = document.getElementById('pay_file');
+            const file = fileInput.files[0];
+            let fileBase64 = "";
+
+            const processSubmit = async () => {
+                const data = {
+                    name: document.getElementById('pay_name').value,
+                    phone: document.getElementById('pay_phone').value,
+                    wilaya: document.getElementById('pay_wilaya').value,
+                    rip: document.getElementById('pay_rip').value,
+                    course: document.getElementById('pay_course').value,
+                    status: 'pending',
+                    fileName: file ? file.name : 'No file',
+                    fileData: fileBase64
+                };
+
+                await saveData('payments', data);
+                
+                Swal.fire({
+                    icon: 'success', title: i18n[state.lang].msg_success,
+                    showConfirmButton: false, timer: 2500, backdrop: `rgba(0,86,179,0.4)`
+                });
+                
+                e.target.reset();
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            };
+
+            if (file) {
+                if (file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                        const img = new Image();
+                        img.onload = async () => {
+                            const canvas = document.createElement('canvas');
+                            const ctx = canvas.getContext('2d');
+                            const maxWidth = 1024;
+                            const scale = Math.min(maxWidth / img.width, 1);
+                            canvas.width = img.width * scale;
+                            canvas.height = img.height * scale;
+                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                            
+                            let quality = 0.9;
+                            let dataUrl = canvas.toDataURL('image/jpeg', quality);
+                            
+                            while (dataUrl.length > 680000 && quality > 0.1) {
+                                quality -= 0.1;
+                                dataUrl = canvas.toDataURL('image/jpeg', quality);
+                            }
+                            
+                            fileBase64 = dataUrl;
+                            await processSubmit();
+                        };
+                        img.src = ev.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    const reader = new FileReader();
+                    reader.onload = async (ev) => {
+                        fileBase64 = ev.target.result;
+                        await processSubmit();
+                    };
+                    reader.readAsDataURL(file);
+                }
+            } else {
+                await processSubmit();
+            }
+        });
+
+        window.openReportModal = () => {
+            Swal.fire({
+                title: `<i class="fas fa-exclamation-triangle" style="color:var(--warning-orange)"></i> ` + i18n[state.lang].nav_report,
+                html: document.getElementById('reportTemplate').innerHTML,
+                confirmButtonText: '<i class="fas fa-paper-plane"></i> إرسال / Envoyer',
+                confirmButtonColor: '#0056b3',
+                preConfirm: () => {
+                    return {
+                        name: document.getElementById('rep_name').value,
+                        email: document.getElementById('rep_email').value,
+                        phone: document.getElementById('rep_phone').value,
+                        desc: document.getElementById('rep_desc').value
+                    }
+                }
+            }).then(async (result) => {
+                if(result.isConfirmed && result.value.name) {
+                    await saveData('reports', result.value);
+                    Swal.fire({ icon:'success', title: i18n[state.lang].msg_report, timer: 1500, showConfirmButton:false });
+                }
+            });
+        };
+
+        window.toggleCommAuth = (type) => {
+            document.getElementById('commLoginForm').classList.toggle('active', type==='login');
+            document.getElementById('commRegForm').classList.toggle('active', type==='register');
+            document.querySelectorAll('#view-commercial .admin-tabs button').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+        };
+
+        window.selectPlan = (plan, element) => {
+            document.querySelectorAll('.plan-card').forEach(c => c.classList.remove('active-plan'));
+            element.classList.add('active-plan');
+            document.getElementById('cr_plan').value = plan;
+        };
+
+        document.getElementById('commRegForm').addEventListener('submit', async(e)=>{
+            e.preventDefault();
+            const comp = document.getElementById('cr_company').value.trim();
+            await saveData('accounts', {
+                name: document.getElementById('cr_name').value,
+                phone: document.getElementById('cr_phone').value,
+                email: document.getElementById('cr_email').value,
+                company: comp,
+                pass: document.getElementById('cr_pass').value,
+                subscription: document.getElementById('cr_plan').value,
+                status: 'pending'
+            });
+            
+            let initialSets = {
+                ar: { name: comp, address: "", about: "", priv: "" },
+                fr: { name: comp, address: "", about: "", priv: "" },
+                rip: "",
+                defaultLang: "ar"
+            };
+
+            let sets = JSON.parse(localStorage.getItem('prouver_settings'));
+            sets[comp] = initialSets;
+            localStorage.setItem('prouver_settings', JSON.stringify(sets));
+
+            if (isFirebaseReady) {
+                try {
+                    await setDoc(doc(db, "settings", comp), initialSets);
+                } catch(e) { console.error("Error creating initial settings in FB", e); }
+            }
+
+            Swal.fire({ icon:'info', title: i18n[state.lang].msg_reg_wait, confirmButtonColor: '#0056b3' });
+            e.target.reset();
+        });
+
+        window.showRenewalPopup = (acc) => {
+            let msg = state.lang === 'ar' ? 'عزيزي المستخدم لقد انتهى اشتراكك يرجى تجديد الاشتراك من اجل مواصلة عملك على prouver.online' : 'Cher utilisateur, votre abonnement a expiré. Veuillez renouveler pour continuer sur prouver.online';
+            
+            let p1 = state.lang === 'ar' ? '2000 دج' : '2000 DA';
+            let p3 = state.lang === 'ar' ? '4500 دج' : '4500 DA';
+            let p6 = state.lang === 'ar' ? '6500 دج' : '6500 DA';
+            let p12 = state.lang === 'ar' ? '10000 دج' : '10000 DA';
+            
+            let t1 = state.lang === 'ar' ? '1 شهر' : '1 Mois';
+            let t3 = state.lang === 'ar' ? '3 أشهر' : '3 Mois';
+            let t6 = state.lang === 'ar' ? '6 أشهر' : '6 Mois';
+            let t12 = state.lang === 'ar' ? '12 شهر' : '12 Mois';
+
+            Swal.fire({
+                title: '<i class="fas fa-lock" style="color:#dc3545; font-size:40px;"></i><br>اشتراك منتهي',
+                html: `
+                    <p style="font-weight:bold; color:#555; margin-bottom:20px;">${msg}</p>
+                    <div class="pricing-plans" style="justify-content:center;">
+                        <div class="plan-card active-plan" onclick="document.querySelectorAll('.plan-card').forEach(c=>c.classList.remove('active-plan')); this.classList.add('active-plan'); document.getElementById('swal_plan').value='1';"><h4>${t1}</h4><p>${p1}</p></div>
+                        <div class="plan-card" onclick="document.querySelectorAll('.plan-card').forEach(c=>c.classList.remove('active-plan')); this.classList.add('active-plan'); document.getElementById('swal_plan').value='3';"><h4>${t3}</h4><p>${p3}</p></div>
+                        <div class="plan-card" onclick="document.querySelectorAll('.plan-card').forEach(c=>c.classList.remove('active-plan')); this.classList.add('active-plan'); document.getElementById('swal_plan').value='6';"><h4>${t6}</h4><p>${p6}</p></div>
+                        <div class="plan-card" onclick="document.querySelectorAll('.plan-card').forEach(c=>c.classList.remove('active-plan')); this.classList.add('active-plan'); document.getElementById('swal_plan').value='12';"><h4>${t12}</h4><p>${p12}</p></div>
+                    </div>
+                    <input type="hidden" id="swal_plan" value="1">
+                `,
+                showCancelButton: true,
+                confirmButtonText: state.lang === 'ar' ? 'تجديد اشتراك' : 'Renouveler',
+                cancelButtonText: state.lang === 'ar' ? 'إلغاء' : 'Annuler',
+                confirmButtonColor: '#0056b3',
+                preConfirm: () => {
+                    return document.getElementById('swal_plan').value;
+                }
+            }).then((result) => {
+                if(result.isConfirmed) {
+                    accAction(acc.id, 'renewal_pending', result.value);
+                    Swal.fire(state.lang === 'ar' ? 'تم الإرسال' : 'Envoyé', state.lang === 'ar' ? 'تم إرسال طلب التجديد للإدارة، يرجى الانتظار.' : 'Demande de renouvellement envoyée avec succès.', 'success');
+                }
+            });
+        };
+
+        document.getElementById('commLoginForm').addEventListener('submit', async (e)=>{
+            e.preventDefault();
+            const em = document.getElementById('cl_email').value;
+            const pw = document.getElementById('cl_pass').value;
+            
+            await fetchDashboardDataFromFirebase();
+            let ldb = JSON.parse(localStorage.getItem('prouver_db'));
+            const acc = ldb.accounts.find(a => a.email === em && a.pass === pw);
+            
+            if(acc) {
+                if(acc.status === 'banned') {
+                    Swal.fire('محظور', 'تم حظر حسابك من قبل الإدارة', 'error');
+                } else if(acc.status === 'expired' || acc.status === 'renewal_pending') {
+                    showRenewalPopup(acc);
+                } else if(acc.status === 'active') {
+                    let pDays = planDays[acc.subscription] || 30;
+                    let elapsed = Math.floor((Date.now() - (acc.approvedAt || acc.timestamp)) / (1000*60*60*24));
+                    if(elapsed >= pDays) {
+                        accAction(acc.id, 'expired');
+                        showRenewalPopup(acc);
+                    } else {
+                        login(acc.company, 'commercial');
+                    }
+                } else {
+                    Swal.fire('حساب قيد المراجعة', 'يرجى الانتظار لحين موافقة الإدارة على حسابك', 'warning');
+                }
+            } else {
+                Swal.fire('خطأ', 'بيانات الدخول غير صحيحة', 'error');
+            }
+        });
+
+        document.getElementById('adminLoginForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const user = document.getElementById('admin_user').value.trim();
+            const pass = document.getElementById('admin_pass').value;
+            
+            if (user === 'admin' && btoa(pass) === 'I2Fib2JvYjIwMjYj') {
+                login('default', 'admin');
+                document.getElementById('adminLoginForm').reset();
+            } else {
+                Swal.fire('Access Denied', 'Invalid Username or Token', 'error');
+            }
+        });
+
+        function login(companyId, role, isRestore = false) {
+            state.role = role;
+            state.companyId = companyId;
+            
+            localStorage.setItem('prouver_auth', JSON.stringify({ role, companyId }));
+            
+            document.getElementById('logoutLink').style.display = 'block';
+            document.getElementById('adminLink').style.display = 'block';
+            document.getElementById('adminLink').setAttribute('onclick', "navigate('dashboard'); toggleMenu();");
+            
+            if(role === 'admin') {
+                document.querySelectorAll('.admin-only').forEach(el => el.style.display = el.tagName === 'TD' || el.tagName === 'TH' ? 'table-cell' : 'block');
+                document.querySelectorAll('.commercial-only').forEach(el => el.style.display = 'none');
+            } else {
+                document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+                document.querySelectorAll('.commercial-only').forEach(el => el.style.display = 'block');
+                document.getElementById('companyUrlContainer').style.display = 'block';
+                const link = window.location.origin + window.location.pathname + '#/' + encodeURIComponent(companyId);
+                document.getElementById('companyLink').href = link;
+                document.getElementById('companyLink').innerText = link;
+            }
+            
+            loadDashboardData();
+            if (!isRestore) navigate('dashboard');
+        }
+
+        window.logout = () => {
+            state.role = 'guest';
+            state.companyId = null;
+            
+            localStorage.removeItem('prouver_auth');
+            
+            document.getElementById('logoutLink').style.display = 'none';
+            document.getElementById('adminLink').style.display = 'none';
+            document.getElementById('adminLink').setAttribute('onclick', "navigate('admin_login'); toggleMenu();");
+            document.getElementById('companyUrlContainer').style.display = 'none';
+            window.location.hash = '';
+            navigate('home');
+        };
+
+        window.switchDashTab = (tab) => {
+            document.querySelectorAll('#view-dashboard .admin-tab-content').forEach(el => el.classList.remove('active'));
+            document.getElementById('tab-' + tab).classList.add('active');
+            document.querySelectorAll('#view-dashboard .tab-btn').forEach(b => b.classList.remove('active'));
+            
+            let btnIndex = ['payments','failed','reports','accounts','settings'].indexOf(tab);
+            if(btnIndex >= 0) {
+                document.querySelectorAll('#view-dashboard .tab-btn')[btnIndex].classList.add('active');
+            }
+        };
+
+        window.openFilteredTab = (tab, filterStatus) => {
+            switchDashTab(tab);
+            let tblBody = tab === 'payments' ? 'tbl_payments' : (tab === 'failed' ? 'tbl_failed' : 'tbl_reports');
+            if(!document.getElementById(tblBody)) return;
+            
+            const rows = document.querySelectorAll(`#${tblBody} tr`);
+            rows.forEach(r => {
+                if(filterStatus === 'all') r.style.display = '';
+                else r.style.display = r.getAttribute('data-status') === filterStatus ? '' : 'none';
+            });
+        };
+
+        window.filterTable = (inputId, tableBodyId) => {
+            const filter = document.getElementById(inputId).value.toLowerCase();
+            const rows = document.querySelectorAll(`#${tableBodyId} tr`);
+            rows.forEach(row => {
+                const text = row.innerText.toLowerCase();
+                row.style.display = text.includes(filter) ? '' : 'none';
+            });
+        };
+
+        window.toggleSelectAll = (tbodyId, sourceCb) => {
+            const checkboxes = document.querySelectorAll(`#${tbodyId} tr:not([style*="display: none"]) .row-cb`);
+            checkboxes.forEach(cb => cb.checked = sourceCb.checked);
+        };
+
+        window.deleteSelected = async (colName, tbodyId) => {
+            const checkedBoxes = document.querySelectorAll(`#${tbodyId} .row-cb:checked`);
+            if(checkedBoxes.length === 0) {
+                Swal.fire(state.lang === 'ar' ? 'تنبيه' : 'Attention', state.lang === 'ar' ? 'يرجى تحديد عنصر واحد على الأقل' : 'Veuillez sélectionner au moins un élément', 'warning');
+                return;
+            }
+            
+            Swal.fire({
+                title: state.lang === 'ar' ? 'تأكيد الحذف' : 'Confirmer la suppression',
+                text: state.lang === 'ar' ? 'هل أنت متأكد من حذف العناصر المحددة؟' : 'Êtes-vous sûr de vouloir supprimer les éléments sélectionnés ?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc3545',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: state.lang === 'ar' ? 'نعم، احذف' : 'Oui, supprimer',
+                cancelButtonText: state.lang === 'ar' ? 'إلغاء' : 'Annuler'
+            }).then(async (result) => {
+                if(result.isConfirmed) {
+                    let dbData = JSON.parse(localStorage.getItem('prouver_db'));
+                    for(let cb of checkedBoxes) {
+                        const id = cb.value;
+                        if(isFirebaseReady && !id.startsWith('id_')) {
+                            try { await deleteDoc(doc(db, colName, id)); } catch(e) {}
+                        }
+                        dbData[colName] = dbData[colName].filter(x => x.id !== id);
+                    }
+                    localStorage.setItem('prouver_db', JSON.stringify(dbData));
+                    loadDashboardData(true);
+                    
+                    const table = document.getElementById(tbodyId).closest('table');
+                    const selectAllCb = table.querySelector('thead input[type="checkbox"]');
+                    if(selectAllCb) selectAllCb.checked = false;
+                    
+                    Swal.fire(state.lang === 'ar' ? 'تم الحذف بنجاح' : 'Supprimé avec succès', '', 'success');
+                }
+            });
+        };
+
+        window.exportData = (tableId, filename) => {
+            const table = document.getElementById(tableId);
+            const checkboxes = table.querySelectorAll('tbody .row-cb');
+            const hasChecked = Array.from(checkboxes).some(cb => cb.checked);
+            
+            let csv = [];
+            for (let i = 0; i < table.rows.length; i++) {
+                let row = table.rows[i];
+                if(row.style.display === 'none') continue;
+                
+                let isChecked = false;
+                if(i > 0) { 
+                    const cb = row.querySelector('.row-cb');
+                    if(cb) isChecked = cb.checked;
+                    if(hasChecked && !isChecked) continue; 
+                }
+
+                let rowData = [], cols = row.querySelectorAll("td, th");
+                for (let j = 1; j < cols.length; j++) {
+                    let text = cols[j].innerText.replace(/(\r\n|\n|\r)/gm, " ").trim();
+                    rowData.push('"' + text.replace(/"/g, '""') + '"');
+                }
+                csv.push(rowData.join(","));
+            }
+            const blob = new Blob(["\uFEFF"+csv.join("\n")], { type: "text/csv;charset=utf-8;" });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = filename + ".csv";
+            link.click();
+        };
+
+        window.downloadProof = (base64Data, filename) => {
+            if(!base64Data) {
+                Swal.fire('تنبيه', 'لا يوجد ملف مرفق قابل للتحميل', 'info');
+                return;
+            }
+            const link = document.createElement('a');
+            link.href = base64Data;
+            link.download = filename || 'proof_receipt';
+            link.click();
+        };
+
+        async function fetchDashboardDataFromFirebase() {
+            if (isFirebaseReady) {
+                try {
+                    let dbData = { payments: [], reports: [], accounts: [] };
+                    const [pSnap, rSnap, aSnap] = await Promise.all([
+                        getDocs(collection(db, "payments")),
+                        getDocs(collection(db, "reports")),
+                        getDocs(collection(db, "accounts"))
+                    ]);
+                    pSnap.forEach(doc => { let d = doc.data(); d.id = doc.id; dbData.payments.push(d); });
+                    rSnap.forEach(doc => { let d = doc.data(); d.id = doc.id; dbData.reports.push(d); });
+                    aSnap.forEach(doc => { let d = doc.data(); d.id = doc.id; dbData.accounts.push(d); });
+                    
+                    localStorage.setItem('prouver_db', JSON.stringify(dbData));
+                } catch(e) {
+                    console.error("Firebase fetch error", e);
+                }
+            }
+        }
+
+        async function loadDashboardData(skipFetch = false) {
+            if (!skipFetch) await fetchDashboardDataFromFirebase();
+            
+            let dbData = JSON.parse(localStorage.getItem('prouver_db'));
+            let sets = JSON.parse(localStorage.getItem('prouver_settings'))[state.companyId] || JSON.parse(localStorage.getItem('prouver_settings'))['default'];
+            
+            let myPayments = dbData.payments.filter(p => p.companyId === state.companyId);
+            let myReports = dbData.reports.filter(r => r.companyId === state.companyId);
+
+            const now = Date.now();
+            let needsUpdate = false;
+            for(let p of myPayments) {
+                if(p.status === 'pending') {
+                    const hrs = (now - p.timestamp) / (1000 * 60 * 60);
+                    if(hrs >= 48) {
+                        p.status = 'failed';
+                        if(isFirebaseReady && p.id && !p.id.startsWith('id_')) {
+                            updateDoc(doc(db, "payments", p.id), { status: 'failed' });
+                        }
+                        needsUpdate = true;
+                    }
+                }
+            }
+            if(needsUpdate) localStorage.setItem('prouver_db', JSON.stringify(dbData));
+
+            document.getElementById('st_all').innerText = myPayments.length;
+            document.getElementById('st_new').innerText = myPayments.filter(p=>p.status==='pending').length;
+            document.getElementById('st_fail').innerText = myPayments.filter(p=>p.status==='failed').length;
+            document.getElementById('st_rep').innerText = myReports.length;
+            if(state.role === 'admin') document.getElementById('st_comm').innerText = dbData.accounts.length;
+
+            const tbodyP = document.getElementById('tbl_payments');
+            tbodyP.innerHTML = '';
+            myPayments.filter(p=>p.status !== 'failed').forEach(p => {
+                const hrs = (now - p.timestamp) / (1000 * 60 * 60);
+                let timeColor = 'bg-green', timeTxt = Math.floor(hrs) + 'h';
+                if(p.status === 'paid') { timeColor = 'bg-gray'; timeTxt = '-'; }
+                else if(hrs >= 24) timeColor = 'bg-orange';
+
+                let actionHtml = p.status === 'paid' ? '<span class="status-badge bg-blue"><i class="fas fa-check"></i> مدفوع</span>' : 
+                    `<button class="btn-action bg-blue" onclick="changePayStatus('${p.id}', 'paid')">قبول</button>
+                     <button class="btn-action bg-red" onclick="changePayStatus('${p.id}', 'failed')">رفض</button>`;
+
+                tbodyP.innerHTML += `<tr data-status="${p.status}">
+                    <td><input type="checkbox" class="row-cb" value="${p.id}"></td>
+                    <td dir="ltr">${new Date(p.timestamp).toLocaleString()}</td>
+                    <td>${p.name}</td><td>${p.wilaya}</td><td style="font-family:monospace; direction:ltr;">${p.rip}</td><td>${p.course || '-'}</td><td dir="ltr">${p.phone}</td>
+                    <td>${p.fileName} <br><button onclick="downloadProof('${p.fileData}', '${p.fileName}')" class="btn-action bg-green" title="تحميل الإثبات"><i class="fas fa-download"></i></button></td>
+                    <td><span class="status-badge ${timeColor}">${timeTxt}</span></td>
+                    <td>${actionHtml}</td>
+                </tr>`;
+            });
+
+            const tbodyF = document.getElementById('tbl_failed');
+            tbodyF.innerHTML = '';
+            myPayments.filter(p=>p.status === 'failed').forEach(p => {
+                tbodyF.innerHTML += `<tr>
+                    <td><input type="checkbox" class="row-cb" value="${p.id}"></td>
+                    <td dir="ltr">${new Date(p.timestamp).toLocaleString()}</td>
+                    <td>${p.name}</td><td>${p.course || '-'}</td>
+                    <td>${p.fileName} <br><button onclick="downloadProof('${p.fileData}', '${p.fileName}')" class="btn-action bg-green"><i class="fas fa-download"></i></button></td>
+                    <td><span class="status-badge bg-red"><i class="fas fa-times"></i> فاشل</span></td>
+                </tr>`;
+            });
+
+            document.getElementById('tbl_reports').innerHTML = myReports.map(r => `<tr>
+                <td><input type="checkbox" class="row-cb" value="${r.id}"></td>
+                <td dir="ltr">${new Date(r.timestamp).toLocaleString()}</td><td>${r.name}</td><td dir="ltr">${r.phone}</td><td>${r.email}</td><td>${r.desc}</td>
+            </tr>`).join('');
+
+            if(state.role === 'admin') {
+                const tbodyReq = document.getElementById('tbl_acc_req');
+                const tbodyAct = document.getElementById('tbl_acc_active');
+                tbodyReq.innerHTML = ''; tbodyAct.innerHTML = '';
+                
+                dbData.accounts.forEach(a => {
+                    let subText = a.subscription === '1' ? '1 ' + i18n[state.lang].txt_month : (a.subscription === '3' ? '3 ' + i18n[state.lang].txt_months : (a.subscription === '6' ? '6 ' + i18n[state.lang].txt_months : '12 ' + i18n[state.lang].txt_month));
+                    
+                    if(a.status === 'pending' || a.status === 'renewal_pending') {
+                        let typeBadge = a.status === 'pending' ? `<span class="status-badge bg-blue">${i18n[state.lang].badge_new}</span>` : `<span class="status-badge bg-orange">${i18n[state.lang].badge_renew}</span>`;
+                        tbodyReq.innerHTML += `<tr><td>${a.company}</td><td>${a.name}</td><td>${a.email}</td><td dir="ltr">${a.phone}</td><td><span class="status-badge bg-dark">${subText}</span></td><td>${typeBadge}</td>
+                            <td><button class="btn-action bg-green" onclick="accAction('${a.id}','active')"><i class="fas fa-check"></i> ${i18n[state.lang].btn_approve}</button>
+                                <button class="btn-action bg-red" onclick="accAction('${a.id}','rejected')"><i class="fas fa-times"></i> ${i18n[state.lang].btn_reject}</button></td></tr>`;
+                    } else if (a.status !== 'rejected') {
+                        const lnk = window.location.origin + window.location.pathname + '#/' + encodeURIComponent(a.company);
+                        
+                        let pDays = planDays[a.subscription] || 30;
+                        let elapsed = Math.floor((now - (a.approvedAt || a.timestamp)) / (1000 * 60 * 60 * 24));
+                        let remaining = pDays - elapsed;
+                        if(remaining <= 0) { remaining = 0; if(a.status==='active') accAction(a.id, 'expired'); }
+
+                        let statusBadge = a.status === 'banned' ? `<span class="status-badge bg-red">${i18n[state.lang].badge_banned}</span>` : (remaining === 0 ? `<span class="status-badge bg-orange">${i18n[state.lang].badge_expired}</span>` : `<span class="status-badge bg-green">${remaining} ${i18n[state.lang].txt_day}</span>`);
+                        let actionBtn = a.status === 'banned' ? `<button class="btn-action bg-green" onclick="accAction('${a.id}','active')"><i class="fas fa-unlock"></i> ${i18n[state.lang].btn_unban}</button>` : `<button class="btn-action bg-red" onclick="accAction('${a.id}','banned')"><i class="fas fa-ban"></i> ${i18n[state.lang].btn_ban}</button>`;
+
+                        tbodyAct.innerHTML += `<tr>
+                            <td>${a.company}</td><td>${a.name}</td><td>${a.email}</td><td dir="ltr">${a.phone}</td>
+                            <td><span class="status-badge bg-blue">${subText}</span></td>
+                            <td>${statusBadge}</td>
+                            <td dir="ltr"><a href="${lnk}" target="_blank" style="color:var(--primary-blue); text-decoration:none;"><i class="fas fa-external-link-alt"></i> ${i18n[state.lang].txt_store_link}</a></td>
+                            <td>${actionBtn}</td></tr>`;
+                    }
+                });
+            } else if (state.role === 'commercial') {
+                let a = dbData.accounts.find(x => x.company === state.companyId);
+                if(a) {
+                    let pDays = planDays[a.subscription] || 30;
+                    let elapsed = Math.floor((now - (a.approvedAt || a.timestamp)) / (1000 * 60 * 60 * 24));
+                    let remaining = pDays - elapsed;
+                    document.getElementById('st_days_left').innerText = remaining > 0 ? remaining : 0;
+                }
+            }
+
+            document.getElementById('set_name_ar').value = sets.ar?.name || "";
+            document.getElementById('set_name_fr').value = sets.fr?.name || "";
+            document.getElementById('set_rip').value = sets.rip || "";
+            document.getElementById('set_address_ar').value = sets.ar?.address || "";
+            document.getElementById('set_address_fr').value = sets.fr?.address || "";
+            
+            if(state.role === 'admin') {
+                document.getElementById('set_about_ar').value = sets.ar?.about || "";
+                document.getElementById('set_about_fr').value = sets.fr?.about || "";
+                document.getElementById('set_priv_ar').value = sets.ar?.priv || "";
+                document.getElementById('set_priv_fr').value = sets.fr?.priv || "";
+                document.getElementById('set_default_lang').value = sets.defaultLang || "ar";
+            }
+        }
+
+        window.changePayStatus = async (id, newStatus) => {
+            if (isFirebaseReady && !id.startsWith('id_')) {
+                try {
+                    await updateDoc(doc(db, "payments", id), { status: newStatus });
+                } catch(e) { console.error(e); }
+            } else {
+                let dbData = JSON.parse(localStorage.getItem('prouver_db'));
+                let p = dbData.payments.find(x => x.id === id);
+                if(p) { p.status = newStatus; localStorage.setItem('prouver_db', JSON.stringify(dbData)); }
+            }
+            loadDashboardData(true);
+        };
+
+        window.accAction = async (id, newStatus, newSub = null) => {
+            let updateData = { status: newStatus };
+            if(newStatus === 'active') updateData.approvedAt = Date.now();
+            if(newSub) updateData.subscription = newSub;
+
+            if (isFirebaseReady && !id.startsWith('id_')) {
+                try {
+                    await updateDoc(doc(db, "accounts", id), updateData);
+                } catch(e) { console.error(e); }
+            } else {
+                let dbData = JSON.parse(localStorage.getItem('prouver_db'));
+                let a = dbData.accounts.find(x => x.id === id);
+                if(a) { 
+                    a.status = newStatus; 
+                    if(newStatus === 'active') a.approvedAt = Date.now();
+                    if(newSub) a.subscription = newSub;
+                    localStorage.setItem('prouver_db', JSON.stringify(dbData)); 
+                }
+            }
+            if(state.role === 'admin' || state.role === 'commercial') loadDashboardData(true);
+        };
+
+        document.getElementById('settingsForm').addEventListener('submit', async (e)=>{
+            e.preventDefault();
+            let allSets = JSON.parse(localStorage.getItem('prouver_settings'));
+            
+            let cur = allSets[state.companyId] || { ar:{}, fr:{} };
+            cur.ar.name = document.getElementById('set_name_ar').value;
+            cur.fr.name = document.getElementById('set_name_fr').value;
+            cur.rip = document.getElementById('set_rip').value;
+            cur.ar.address = document.getElementById('set_address_ar').value;
+            cur.fr.address = document.getElementById('set_address_fr').value;
+
+            if(state.role === 'admin') {
+                cur.ar.about = document.getElementById('set_about_ar').value;
+                cur.fr.about = document.getElementById('set_about_fr').value;
+                cur.ar.priv = document.getElementById('set_priv_ar').value;
+                cur.fr.priv = document.getElementById('set_priv_fr').value;
+                cur.defaultLang = document.getElementById('set_default_lang').value;
+            }
+
+            allSets[state.companyId] = cur;
+            localStorage.setItem('prouver_settings', JSON.stringify(allSets));
+            
+            if (isFirebaseReady) {
+                try {
+                    await setDoc(doc(db, "settings", state.companyId), cur);
+                } catch(error) { console.error("Error saving settings to FB", error); }
+            }
+
+            Swal.fire({icon:'success', title: state.lang==='ar'?'تم الحفظ':'Sauvegardé', text: state.lang==='ar'?'تم تحديث المعلومات بنجاح':'Informations mises à jour avec succès', confirmButtonColor:'#0056b3'});
+            loadPublicSettings(); 
+        });
+
+    })();
+</script>
+</body>
+</html>
