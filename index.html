@@ -1579,8 +1579,8 @@
                             tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;">${state.lang === 'ar' ? 'لا توجد طلبات قيد الانتظار' : 'Aucune demande en attente'}</td></tr>`;
                         } else {
                             myPendingPayments.forEach(p => {
-                                let cleanRip = p.rip.replace(/\s+/g, '').replace(/-/g, '');
-                                let isMatched = extractedText.includes(cleanRip);
+                                let cleanName = p.name.replace(/\s+/g, '').toLowerCase();
+                                let isMatched = extractedText.toLowerCase().includes(cleanName);
                                 
                                 let statusBadge = isMatched 
                                     ? `<span class="status-badge bg-green"><i class="fas fa-check"></i> ${i18n[state.lang].status_paid}</span>`
