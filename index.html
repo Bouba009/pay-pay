@@ -1,15 +1,7 @@
+
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-    <!-- مكتبة قراءة Excel و CSV -->
-    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-    <!-- مكتبة قراءة الصور (OCR) -->
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <!-- مكتبة قراءة PDF -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-    <script>
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
-    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Prouver - Payment Verification</title>
@@ -18,6 +10,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- SweetAlert2 for Professional Animated Popups -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- Tesseract.js for OCR (Optical Character Recognition) -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
     <style>
         /* --- CSS Variables & Reset --- */
@@ -451,6 +445,7 @@
                 <button class="tab-btn" onclick="switchDashTab('reports')" data-i18n="tab_rep"><i class="fas fa-envelope-open-text"></i> الابلاغات</button>
                 <button class="tab-btn admin-only" onclick="switchDashTab('accounts')" data-i18n="tab_acc"><i class="fas fa-users"></i> الحسابات</button>
                 <button class="tab-btn" onclick="switchDashTab('settings')" data-i18n="tab_set"><i class="fas fa-cogs"></i> قسم المعلومات</button>
+                <button class="tab-btn" onclick="switchDashTab('review')" data-i18n="tab_review"><i class="fas fa-search-dollar"></i> قسم المراجعة</button>
             </div>
 
             <!-- Payments Tab -->
@@ -574,6 +569,35 @@
                 </div>
             </div>
 
+            <!-- Review Tab -->
+            <div id="tab-review" class="admin-tab-content">
+                <div class="form-container" style="margin-bottom: 20px;">
+                    <h4 style="margin-bottom:15px; color:var(--primary-blue);"><i class="fas fa-file-invoice-dollar"></i> <span data-i18n="txt_upload_ccp">رفع كشف حساب (CCP) للمطابقة</span></h4>
+                    <input type="file" id="ccp_statement_file" class="form-control" accept="image/*" style="margin-bottom: 15px;">
+                    <button class="btn-submit" onclick="scanCCPStatement()" id="btn_scan_ccp"><i class="fas fa-search"></i> <span data-i18n="btn_scan">فحص ومطابقة</span></button>
+                </div>
+                
+                <div class="table-toolbar">
+                    <div style="flex-grow: 1;"></div>
+                    <button class="btn-export" onclick="exportData('main_tbl_review', 'المراجعة_CCP')"><i class="fas fa-file-csv"></i> <span data-i18n="btn_csv">تحميل CSV</span></button>
+                </div>
+                <div class="table-responsive">
+                    <table id="main_tbl_review">
+                        <thead>
+                            <tr>
+                                <th data-i18n="th_name">الاسم</th>
+                                <th>RIP / CCP</th>
+                                <th data-i18n="th_phone">الهاتف</th>
+                                <th data-i18n="th_ccp_status">حالة الدفع</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbl_review">
+                            <!-- JS Will Fill This -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
         </section>
 
     </main>
@@ -659,7 +683,8 @@
                 th_date: "الوقت والتاريخ", th_name: "الاسم", th_wilaya: "الولاية", th_course: "الدورة", th_phone: "الهاتف", th_duration: "المدة", th_action: "الحالة / إجراء", th_status: "الحالة", th_desc: "الوصف",
                 set_title_chq: "معلومات الدفع (الشيك الذي يظهر للعملاء)",
                 pl_name: "الاسم واللقب...", pl_phone: "05/06/07...", pl_wilaya: "مثال: الجزائر العاصمة", pl_rip: "RIP الخاص بك", pl_course: "ما الذي دفعت ثمنه؟", pl_search_pay: "ابحث عن اسم، هاتف، دورة...", pl_search_fail: "ابحث عن اسم، دورة...",
-                acc_req_title: "طلبات حسابات تجارية (جديدة / تفعيل)", acc_act_title: "حسابات تجارية نشطة و منتهية", th_company: "الشركة", th_admin: "المسؤول", th_email: "البريد", th_sub_chosen: "الاشتراك المختار", th_sub: "الاشتراك", th_type: "النوع", th_days_left: "الأيام المتبقية", th_link: "الرابط المخصص", txt_month: "شهر", txt_months: "أشهر", badge_new: "جديد", badge_renew: "تجديد", btn_approve: "موافق", btn_reject: "رفض", badge_banned: "محظور", badge_expired: "منتهي", txt_day: "يوم", btn_unban: "فك الحظر", btn_ban: "حظر", txt_store_link: "رابط المتجر"
+                acc_req_title: "طلبات حسابات تجارية (جديدة / تفعيل)", acc_act_title: "حسابات تجارية نشطة و منتهية", th_company: "الشركة", th_admin: "المسؤول", th_email: "البريد", th_sub_chosen: "الاشتراك المختار", th_sub: "الاشتراك", th_type: "النوع", th_days_left: "الأيام المتبقية", th_link: "الرابط المخصص", txt_month: "شهر", txt_months: "أشهر", badge_new: "جديد", badge_renew: "تجديد", btn_approve: "موافق", btn_reject: "رفض", badge_banned: "محظور", badge_expired: "منتهي", txt_day: "يوم", btn_unban: "فك الحظر", btn_ban: "حظر", txt_store_link: "رابط المتجر",
+                tab_review: "قسم المراجعة", txt_upload_ccp: "رفع كشف حساب (CCP) للمطابقة", btn_scan: "فحص ومطابقة", status_paid: "مدفوع", status_unpaid: "غير مدفوع", th_ccp_status: "حالة الدفع", txt_wait_scan: "في انتظار الفحص..."
             },
             fr: {
                 nav_home: "Confirmer Paiement", nav_about: "À propos", nav_privacy: "Politique de conf.", nav_report: "Signaler un prob.", nav_commercial: "Compte Commercial", nav_logout: "Déconnexion",
@@ -677,7 +702,8 @@
                 th_date: "Date et Heure", th_name: "Nom", th_wilaya: "Wilaya", th_course: "Formation", th_phone: "Téléphone", th_duration: "Durée", th_action: "Statut / Action", th_status: "Statut", th_desc: "Description",
                 set_title_chq: "Informations de paiement (Chèque affiché aux clients)",
                 pl_name: "Nom et Prénom...", pl_phone: "05/06/07...", pl_wilaya: "Ex: Alger", pl_rip: "Votre RIP", pl_course: "Qu'avez-vous payé?", pl_search_pay: "Chercher nom, téléphone...", pl_search_fail: "Chercher nom, formation...",
-                acc_req_title: "Demandes de comptes commerciaux (Nouveau / Activation)", acc_act_title: "Comptes commerciaux actifs et expirés", th_company: "Entreprise", th_admin: "Admin", th_email: "Email", th_sub_chosen: "Abonnement choisi", th_sub: "Abonnement", th_type: "Type", th_days_left: "Jours restants", th_link: "Lien personnalisé", txt_month: "Mois", txt_months: "Mois", badge_new: "Nouveau", badge_renew: "Renouv.", btn_approve: "Approuver", btn_reject: "Rejeter", badge_banned: "Banni", badge_expired: "Expiré", txt_day: "Jour", btn_unban: "Débloquer", btn_ban: "Bannir", txt_store_link: "Lien du magasin"
+                acc_req_title: "Demandes de comptes commerciaux (Nouveau / Activation)", acc_act_title: "Comptes commerciaux actifs et expirés", th_company: "Entreprise", th_admin: "Admin", th_email: "Email", th_sub_chosen: "Abonnement choisi", th_sub: "Abonnement", th_type: "Type", th_days_left: "Jours restants", th_link: "Lien personnalisé", txt_month: "Mois", txt_months: "Mois", badge_new: "Nouveau", badge_renew: "Renouv.", btn_approve: "Approuver", btn_reject: "Rejeter", badge_banned: "Banni", badge_expired: "Expiré", txt_day: "Jour", btn_unban: "Débloquer", btn_ban: "Bannir", txt_store_link: "Lien du magasin",
+                tab_review: "Section Révision", txt_upload_ccp: "Télécharger le relevé CCP", btn_scan: "Scanner et Vérifier", status_paid: "Payé", status_unpaid: "Non Payé", th_ccp_status: "Statut de Paiement", txt_wait_scan: "En attente de scan..."
             }
         };
 
@@ -1160,7 +1186,7 @@
             document.getElementById('tab-' + tab).classList.add('active');
             document.querySelectorAll('#view-dashboard .tab-btn').forEach(b => b.classList.remove('active'));
             
-            let btnIndex = ['payments','failed','reports','accounts','settings'].indexOf(tab);
+            let btnIndex = ['payments','failed','reports','accounts','settings','review'].indexOf(tab);
             if(btnIndex >= 0) {
                 document.querySelectorAll('#view-dashboard .tab-btn')[btnIndex].classList.add('active');
             }
@@ -1251,6 +1277,15 @@
                 for (let j = 1; j < cols.length; j++) {
                     let text = cols[j].innerText.replace(/(\r\n|\n|\r)/gm, " ").trim();
                     rowData.push('"' + text.replace(/"/g, '""') + '"');
+                }
+                // Push correctly formatted CSV row, but for the new Review table which lacks checkbox skipping at 0 index, we must handle carefully.
+                // The review table doesn't have checkboxes yet. We handle normally if index 0 doesn't exist.
+                if(!row.querySelector('.row-cb')) {
+                    rowData = [];
+                    for (let j = 0; j < cols.length; j++) {
+                        let text = cols[j].innerText.replace(/(\r\n|\n|\r)/gm, " ").trim();
+                        rowData.push('"' + text.replace(/"/g, '""') + '"');
+                    }
                 }
                 csv.push(rowData.join(","));
             }
@@ -1361,6 +1396,28 @@
                 <td><input type="checkbox" class="row-cb" value="${r.id}"></td>
                 <td dir="ltr">${new Date(r.timestamp).toLocaleString()}</td><td>${r.name}</td><td dir="ltr">${r.phone}</td><td>${r.email}</td><td>${r.desc}</td>
             </tr>`).join('');
+
+            // --- Fill Review Tab Defaults ---
+            const tbodyRev = document.getElementById('tbl_review');
+            if(tbodyRev) {
+                tbodyRev.innerHTML = '';
+                let pendingRev = myPayments.filter(p => p.status === 'pending');
+                if(pendingRev.length === 0) {
+                    tbodyRev.innerHTML = `<tr><td colspan="4" style="text-align:center;">${state.lang === 'ar' ? 'لا توجد طلبات قيد الانتظار' : 'Aucune demande en attente'}</td></tr>`;
+                } else {
+                    pendingRev.forEach(p => {
+                        tbodyRev.innerHTML += `
+                            <tr>
+                                <td>${p.name}</td>
+                                <td style="font-family:monospace; direction:ltr;">${p.rip}</td>
+                                <td dir="ltr">${p.phone}</td>
+                                <td><span class="status-badge bg-gray"><i class="fas fa-clock"></i> ${i18n[state.lang].txt_wait_scan}</span></td>
+                            </tr>
+                        `;
+                    });
+                }
+            }
+            // -------------------------------
 
             if(state.role === 'admin') {
                 const tbodyReq = document.getElementById('tbl_acc_req');
@@ -1485,6 +1542,83 @@
             Swal.fire({icon:'success', title: state.lang==='ar'?'تم الحفظ':'Sauvegardé', text: state.lang==='ar'?'تم تحديث المعلومات بنجاح':'Informations mises à jour avec succès', confirmButtonColor:'#0056b3'});
             loadPublicSettings(); 
         });
+
+        // --- Scan CCP Logic (Review Tab) ---
+        window.scanCCPStatement = async () => {
+            const fileInput = document.getElementById('ccp_statement_file');
+            const file = fileInput.files[0];
+            if(!file) {
+                Swal.fire(state.lang === 'ar' ? 'تنبيه' : 'Attention', state.lang === 'ar' ? 'يرجى رفع ملف كشف الحساب أولاً' : 'Veuillez d\'abord télécharger un fichier', 'warning');
+                return;
+            }
+
+            const btn = document.getElementById('btn_scan_ccp');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + (state.lang === 'ar' ? 'جاري الفحص والمطابقة...' : 'Scan en cours...');
+            btn.disabled = true;
+
+            try {
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    try {
+                        const imgData = e.target.result;
+                        
+                        // Run Tesseract.js OCR
+                        const worker = await Tesseract.createWorker('eng');
+                        const ret = await worker.recognize(imgData);
+                        const extractedText = ret.data.text.replace(/\s+/g, '').replace(/-/g, ''); // Clean formatting
+                        await worker.terminate();
+
+                        let dbData = JSON.parse(localStorage.getItem('prouver_db')) || {payments:[]};
+                        let myPendingPayments = dbData.payments.filter(p => p.companyId === state.companyId && p.status === 'pending');
+
+                        const tbody = document.getElementById('tbl_review');
+                        tbody.innerHTML = '';
+
+                        if(myPendingPayments.length === 0) {
+                            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;">${state.lang === 'ar' ? 'لا توجد طلبات قيد الانتظار' : 'Aucune demande en attente'}</td></tr>`;
+                        } else {
+                            myPendingPayments.forEach(p => {
+                                let cleanRip = p.rip.replace(/\s+/g, '').replace(/-/g, '');
+                                let isMatched = extractedText.includes(cleanRip);
+                                
+                                let statusBadge = isMatched 
+                                    ? `<span class="status-badge bg-green"><i class="fas fa-check"></i> ${i18n[state.lang].status_paid}</span>`
+                                    : `<span class="status-badge bg-red"><i class="fas fa-times"></i> ${i18n[state.lang].status_unpaid}</span>`;
+                                    
+                                tbody.innerHTML += `
+                                    <tr>
+                                        <td>${p.name}</td>
+                                        <td style="font-family:monospace; direction:ltr;">${p.rip}</td>
+                                        <td dir="ltr">${p.phone}</td>
+                                        <td>${statusBadge}</td>
+                                    </tr>
+                                `;
+                            });
+                        }
+
+                        Swal.fire({
+                            icon: 'success', 
+                            title: state.lang === 'ar' ? 'تم الفحص والمطابقة بنجاح' : 'Vérification terminée',
+                            showConfirmButton: false, timer: 2000
+                        });
+                        
+                    } catch (innerErr) {
+                        console.error(innerErr);
+                        Swal.fire('Error', state.lang === 'ar' ? 'فشل فحص الصورة (OCR Error)' : 'Échec de l\'analyse de l\'image', 'error');
+                    } finally {
+                        btn.innerHTML = originalText;
+                        btn.disabled = false;
+                    }
+                };
+                reader.readAsDataURL(file);
+            } catch (err) {
+                console.error(err);
+                Swal.fire('Error', 'حدث خطأ غير متوقع / Erreur inattendue', 'error');
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        };
 
     })();
 </script>
